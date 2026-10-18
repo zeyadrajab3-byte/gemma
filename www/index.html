@@ -5,31 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>جِمّا</title>
 <style>
-  @font-face {
-    font-family: "Lalezar";
-    src: url("Lalezar-Regular.ttf") format("truetype");
-    font-weight: 400;
-  }
-  @font-face {
-    font-family: "Cairo";
-    src: url("Cairo.ttf") format("truetype");
-    font-weight: 200 1000;
-  }
-  html, body { height: 100%; margin: 0; background: #000000; color: #F2F6F9; font-family: "Cairo", sans-serif; }
-  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
-  h1 { font-family: "Lalezar", sans-serif; font-weight: 400; color: #38BDF8; font-size: 72px; margin: 0; }
+  @font-face { font-family: "Lalezar"; src: url("Lalezar-Regular.ttf") format("truetype"); font-weight: 400; }
+  @font-face { font-family: "Cairo"; src: url("Cairo.ttf") format("truetype"); font-weight: 200 1000; }
+  :root { --bg:#000000; --card:#111418; --text:#F2F6F9; --sky:#38BDF8; --btn-text:#0B1117; --yellow:#FACC15; }
+  :root[data-theme="light"] { --bg:#FFFFFF; --card:#F3F6F9; --text:#0B1117; --sky:#0EA5E9; --btn-text:#0B1117; --yellow:#EAB308; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: "Cairo", sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; box-sizing: border-box; }
+  h1 { font-family: "Lalezar", sans-serif; font-weight: 400; color: var(--sky); font-size: 72px; margin: 0; }
   p { margin: 0; opacity: .85; font-size: 18px; }
-  .nums { font-family: "Lalezar", sans-serif; font-size: 44px; color: #F2F6F9; direction: ltr; }
-  .nums-cairo { font-family: "Cairo", sans-serif; font-weight: 800; font-size: 44px; color: #F2F6F9; direction: ltr; }
-  .label { font-size: 13px; opacity: .6; }
+  .nums { font-family: "Lalezar", sans-serif; font-size: 44px; direction: ltr; }
+  .row { display: flex; gap: 12px; margin-top: 10px; }
+  button { font-family: "Cairo", sans-serif; font-weight: 700; font-size: 18px; min-height: 52px; padding: 0 28px; border: 0; border-radius: 14px; background: var(--sky); color: var(--btn-text); }
+  #status { font-size: 14px; background: var(--card); border-radius: 12px; padding: 10px 14px; max-width: 320px; text-align: center; min-height: 20px; }
 </style>
 </head>
 <body>
   <h1>جِمّا</h1>
-  <p>المرحلة 0 · النسخة 3</p>
-  <div class="label">أرقام Lalezar</div>
+  <p>المرحلة 0 · النسخة 4</p>
   <div class="nums">10 × 62.5 kg</div>
-  <div class="label">أرقام Cairo ثقيل</div>
-  <div class="nums-cairo">10 × 62.5 kg</div>
+  <div class="row">
+    <button id="bDark">داكن</button>
+    <button id="bLight">فاتح</button>
+  </div>
+  <div id="status">اختار مود، والأيقونة المفروض تتبدل معاه</div>
+<script>
+(function () {
+  var st = document.getElementById("status");
+  function applyTheme(m) { document.documentElement.setAttribute("data-theme", m); }
+  function saved() { try { return localStorage.getItem("gemma_theme") || "dark"; } catch (e) { return "dark"; } }
+  function save(m) { try { localStorage.setItem("gemma_theme", m); } catch (e) {} }
+  function plugin() { return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.IconSwitcher; }
+  function setMode(m) {
+    applyTheme(m); save(m);
+    var p = plugin();
+    if (!p) { st.textContent = "المود اتبدل، بس بلجن الأيقونة مش موجود"; return; }
+    p.setIcon({ mode: m }).then(function (r) {
+      st.textContent = "تمام: الأيقونة بقت " + (r.mode === "light" ? "الفاتحة" : "الداكنة") + " (ممكن اللانشر ياخد كام ثانية)";
+    }).catch(function (e) {
+      st.textContent = "فشل تبديل الأيقونة: " + (e && e.message ? e.message : e);
+    });
+  }
+  applyTheme(saved());
+  document.getElementById("bDark").addEventListener("click", function () { setMode("dark"); });
+  document.getElementById("bLight").addEventListener("click", function () { setMode("light"); });
+})();
+</script>
 </body>
 </html>
