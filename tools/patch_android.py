@@ -85,6 +85,68 @@ public class IconSwitcherPlugin extends Plugin {
 }
 ''')
 
+# 3b) بلجن نسخ ملف من عنوان content:// لمساحة التطبيق (بالبث، من غير ما يحمّل الملف في الذاكرة)
+open(f"{jdir}/FileCopyPlugin.java", "w", encoding="utf-8").write('''package com.ziad.gemma;
+
+import android.net.Uri;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+@CapacitorPlugin(name = "FileCopy")
+public class FileCopyPlugin extends Plugin {
+
+    @PluginMethod
+    public void copyUri(PluginCall call) {
+        String uri = call.getString("uri");
+        String path = call.getString("path");
+        if (uri == null || path == null || path.contains("..")) {
+            call.reject("bad arguments");
+            return;
+        }
+        File dest = new File(getContext().getFilesDir(), path);
+        File parent = dest.getParentFile();
+        if (parent != null) parent.mkdirs();
+        File tmp = new File(dest.getPath() + ".part");
+        long total = 0;
+        try (InputStream in = getContext().getContentResolver().openInputStream(Uri.parse(uri))) {
+            if (in == null) {
+                call.reject("cannot open uri");
+                return;
+            }
+            try (OutputStream out = new FileOutputStream(tmp)) {
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = in.read(buf)) != -1) {
+                    out.write(buf, 0, n);
+                    total += n;
+                }
+                out.flush();
+            }
+        } catch (Exception e) {
+            tmp.delete();
+            call.reject("copy failed: " + e.getMessage());
+            return;
+        }
+        if (dest.exists()) dest.delete();
+        if (!tmp.renameTo(dest)) {
+            tmp.delete();
+            call.reject("rename failed");
+            return;
+        }
+        JSObject r = new JSObject();
+        r.put("size", total);
+        call.resolve(r);
+    }
+}
+''')
+
 # 4) MainActivity يسجّل البلجن
 open(f"{jdir}/MainActivity.java", "w", encoding="utf-8").write('''package com.ziad.gemma;
 
@@ -95,6 +157,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(IconSwitcherPlugin.class);
+        registerPlugin(FileCopyPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
