@@ -72,7 +72,7 @@
     await trace('1) قبل النسخ من: ' + srcPath + ' ← ' + rel);
     await S.copyIn(srcPath, rel);
     await trace('2) النسخ نجح');
-    fsPlugin().deleteFile({ path: srcPath }).catch(function () {}); // مسح نسخة المنتقي المؤقتة
+    if (!/^content:/i.test(srcPath)) fsPlugin().deleteFile({ path: srcPath }).catch(function () {}); // مسح نسخة المنتقي المؤقتة بس، مش الأصل
     return rel;
   }
 
