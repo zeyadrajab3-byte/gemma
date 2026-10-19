@@ -174,3 +174,36 @@
   };
 
   function showError(e) {
+    var box = document.getElementById('screen');
+    box.innerHTML = '';
+    box.appendChild(h('div', { class: 'card' }, [
+      h('h3', { class: 'title', text: 'حصل خطأ' }),
+      h('p', { class: 'dim num', text: String(e && e.message ? e.message : e) })
+    ]));
+    console.error(e);
+  }
+
+  // مكتبة وباقي الشاشات بتاخد الأدوات من هنا
+  window.GemmaUI = UI;
+
+  // ---------- التشغيل ----------
+  // بيستنى تحميل كل السكريبتات (library.js بعد app.js) وبعدين يبدأ
+  async function boot() {
+    var S = window.GemmaStore;
+    try {
+      var d = await S.init();
+      if (window.GemmaMuscles.ensureSeeded(d)) await S.save();
+      UI.applyTheme(d.settings && d.settings.theme);
+    } catch (e) {
+      current = START_TAB;
+      renderBar();
+      showError(e);
+      return;
+    }
+    var A = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (A && A.addListener) A.addListener('backButton', onBackButton);
+    go(START_TAB);
+  }
+
+  window.addEventListener('load', boot);
+})();
