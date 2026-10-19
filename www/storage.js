@@ -105,8 +105,14 @@
     return window.Capacitor.convertFileSrc(r.uri);
   }
   async function copyIn(fromUri, relPath) {
-    // fromUri: مسار الملف اللي اختاره المنتقي
-    await fs().copy({ from: fromUri, to: relPath, toDirectory: DIR });
+    // fromUri: اللي رجّعه المنتقي. عناوين content:// بتتنسخ ببلجن أصلي (FileCopy)
+    if (/^content:/i.test(fromUri)) {
+      var fc = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FileCopy;
+      if (!fc) throw new Error('بلجن النسخ مش موجود');
+      await fc.copyUri({ uri: fromUri, path: relPath });
+    } else {
+      await fs().copy({ from: fromUri, to: relPath, toDirectory: DIR });
+    }
     return relPath;
   }
   async function removeFile(relPath) {
