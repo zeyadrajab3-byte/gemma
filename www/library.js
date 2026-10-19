@@ -18,6 +18,8 @@
   function D() { return S.data; }
   function fsPlugin() { return window.Capacitor.Plugins.Filesystem; }
   function fail(e) { UI.toast('خطأ: ' + (e && e.message ? e.message : e), 5000); }
+  // تتبع مؤقت: بيتحفظ قبل كل خطوة، فيفضل موجود حتى لو التطبيق وقع
+  function trace(msg) { D().debug = msg; return S.save().catch(function () {}); }
 
   // ---------- بيانات ----------
   function groupOf(id) { return D().muscles.filter(function (m) { return m.id === id; })[0] || null; }
@@ -67,7 +69,9 @@
   }
   async function copyVideoIn(srcPath, origName) {
     var rel = 'videos/' + S.id('v') + extOf(origName);
+    await trace('1) قبل النسخ من: ' + srcPath + ' ← ' + rel);
     await S.copyIn(srcPath, rel);
+    await trace('2) النسخ نجح');
     fsPlugin().deleteFile({ path: srcPath }).catch(function () {}); // مسح نسخة المنتقي المؤقتة
     return rel;
   }
@@ -102,6 +106,7 @@
     try {
       var files = await pickVideos(true);
       if (!files.length) return;
+      await trace('0) المنتقي رجّع: ' + JSON.stringify(files.map(function (f) { return { path: f.path, name: f.name, size: f.size, type: f.mimeType }; })));
       files.forEach(function (f) {
         pending().push({ id: S.id('imp'), src: f.path, orig: f.name || '', file: null });
       });
@@ -127,6 +132,7 @@
         todo[i].file = await copyVideoIn(todo[i].src, todo[i].orig);
       } catch (e) {
         failed++;
+        await trace('خطأ: ' + (e && e.message ? e.message : e));
         D().pendingImports = pending().filter(function (p) { return p !== todo[i]; });
       }
       await S.save();
@@ -312,6 +318,7 @@
     if (wait) txt.push(wait + ' فيديو لسه ما اتنسخش');
     box.appendChild(h('div', { class: 'card' }, [
       h('p', { text: txt.join(' · ') }),
+      D().debug ? h('p', { class: 'dim', style: 'font-size:12px;direction:ltr;text-align:left;word-break:break-all', text: D().debug }) : null,
       h('button', { class: 'btn primary block', text: wait ? 'كمّل النسخ والتسمية' : 'كمّل التسمية', on: { click: async function () {
         try { await copyPending(); nameNext(); } catch (e) { fail(e); }
       } } })
