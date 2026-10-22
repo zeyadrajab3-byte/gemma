@@ -88,6 +88,21 @@
     return p;
   }
 
+  // استبدال كل البيانات (للاستعادة). بيحفظ نسخة أمان من البيانات الحالية الأول.
+  async function replaceAll(obj) {
+    await queue;
+    var old = data;
+    try { await fs().deleteFile({ path: 'data.pre-restore.json', directory: DIR }); } catch (e) {}
+    if (await exists(FILE)) {
+      await fs().copy({ from: FILE, to: 'data.pre-restore.json', directory: DIR, toDirectory: DIR });
+    }
+    delete obj.debug;
+    data = migrate(obj);
+    try { await save(); }
+    catch (e) { data = old; throw e; }
+    return data;
+  }
+
   function id(prefix) {
     return (prefix || 'x') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
@@ -122,6 +137,7 @@
   window.GemmaStore = {
     init: init,
     save: save,
+    replaceAll: replaceAll,
     get data() { return data; },
     id: id,
     today: today,
