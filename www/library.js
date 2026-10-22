@@ -11,8 +11,7 @@
     play: '<path d="M9 6l9 6-9 6z"/>'
   };
 
-  var view = { muscleId: null, placeId: null };
-  var libBack = null;
+  var query = '';
   var lastPlaceId = '';
 
   function D() { return S.data; }
@@ -22,11 +21,6 @@
   function trace(msg) { D().debug = msg; return S.save().catch(function () {}); }
 
   // ---------- بيانات ----------
-  function groupOf(id) { return D().muscles.filter(function (m) { return m.id === id; })[0] || null; }
-  function placeIdsOf(g) { return g.parts && g.parts.length ? g.parts.map(function (p) { return p.id; }) : [g.id]; }
-  function exercisesIn(placeIds) {
-    return D().exercises.filter(function (e) { return !e.archived && placeIds.indexOf(e.placeId) >= 0; });
-  }
   function hasLog(exId) {
     return D().sessions.some(function (s) { return (s.sets || []).some(function (x) { return x.exerciseId === exId; }); });
   }
@@ -189,10 +183,7 @@
     var isNew = !ex;
     var nameIn = h('input', { type: 'text', placeholder: 'اسم التمرين' });
     nameIn.value = ex ? ex.name : '';
-    var startPlace = ex ? ex.placeId : (view.placeId || (function () {
-      var g = view.muscleId && groupOf(view.muscleId);
-      return g && !(g.parts && g.parts.length) ? g.id : lastPlaceId;
-    })());
+    var startPlace = ex ? ex.placeId : lastPlaceId;
     var sel = placeSelect(startPlace);
     var newVideo = null, removeVideo = false, saved = false;
     var videoNote = h('p', { class: 'dim', text: ex && ex.videoFile ? 'فيه فيديو' : 'من غير فيديو' });
@@ -275,21 +266,37 @@
     var sh = UI.sheet({ title: 'الأرشيف', content: list, actions: [{ label: 'قفل' }] });
   }
 
-  // ---------- الرسم ----------
-  function goUp() {
-    var g = view.muscleId && groupOf(view.muscleId);
-    if (view.placeId && g && g.parts && g.parts.length) view.placeId = null;
-    else { view.muscleId = null; view.placeId = null; }
-    UI.render();
+  // ---------- البحث ----------
+  // بنوحّد الحروف (أ إ آ ← ا، ة ← ه، ى ← ي) وبنشيل التشكيل، عشان البحث يلقط مهما اتكتب
+  function norm(t) {
+    return String(t || '').toLowerCase()
+      .replace(/[ً-ٰٟـ]/g, '')
+      .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ذ/g, 'د');
+  }
+  // كل كلمة في البحث لازم تتلاقى في (اسم التمرين + العضلة + الجزء)
+  function matches(ex, tokens) {
+    if (!tokens.length) return true;
+    var p = M.findPlace(D(), ex.placeId);
+    var hay = norm(ex.name + ' ' + (p ? p.muscleName + ' ' + p.name : ''));
+    return tokens.every(function (t) { return hay.indexOf(t) >= 0; });
+  }
+  // كل التمارين مترتبة بترتيب العضلات والأجزاء
+  function sortedExercises() {
+    var order = {};
+    M.places(D()).forEach(function (p, i) { order[p.id] = i; });
+    return D().exercises.filter(function (e) { return !e.archived; })
+      .map(function (e, i) { return { e: e, k: (order[e.placeId] === undefined ? 9999 : order[e.placeId]), i: i }; })
+      .sort(function (a, b) { return a.k - b.k || a.i - b.i; })
+      .map(function (x) { return x.e; });
   }
 
-  function head(title, showBack) {
-    var kids = [];
-    if (showBack) kids.push(h('button', { class: 'icon-btn', 'aria-label': 'رجوع', on: { click: function () { goUp(); } } }, [UI.icon(ICON.back)]));
-    kids.push(h('h1', { class: 'title', text: title }));
-    kids.push(h('button', { class: 'icon-btn' + (UI.editing ? ' on' : ''), 'aria-label': 'تعديل',
-      on: { click: function () { UI.setEditing(!UI.editing); } } }, [UI.icon(UI.editing ? ICON.check : ICON.pencil)]));
-    return h('div', { class: 'page-head' }, kids);
+  // ---------- الرسم ----------
+  function head(title) {
+    return h('div', { class: 'page-head' }, [
+      h('h1', { class: 'title', text: title }),
+      h('button', { class: 'icon-btn' + (UI.editing ? ' on' : ''), 'aria-label': 'تعديل',
+        on: { click: function () { UI.setEditing(!UI.editing); } } }, [UI.icon(UI.editing ? ICON.check : ICON.pencil)])
+    ]);
   }
 
   function row(name, sub, badge, onClick, extra) {
@@ -303,7 +310,7 @@
   function exerciseRow(ex) {
     var extra = ex.videoFile ? h('span', { class: 'dim' }, [UI.icon(ICON.play)]) : null;
     if (extra) { extra.firstChild.style.cssText = 'width:20px;height:20px;fill:currentColor'; }
-    return row(ex.name, ex.videoFile ? null : 'من غير فيديو', null, function () {
+    return row(ex.name, placeLabel(ex.placeId) + (ex.videoFile ? '' : ' · من غير فيديو'), null, function () {
       if (UI.editing) openExerciseSheet(ex); else playVideo(ex);
     }, extra);
   }
@@ -326,56 +333,49 @@
   }
 
   function renderLibrary(box) {
-    if (libBack) { UI.popBack(libBack); libBack = null; }
     var d = D();
-    var g = view.muscleId ? groupOf(view.muscleId) : null;
-    if (view.muscleId && !g) { view.muscleId = null; view.placeId = null; }
-    if (g) { libBack = function () { goUp(); }; UI.pushBack(libBack); }
+    box.appendChild(head('مكتبة التمارين'));
+    renderPendingBanner(box);
+    if (UI.editing) {
+      box.appendChild(h('div', { class: 'actions', style: 'display:flex;gap:10px;margin-bottom:14px' }, [
+        h('button', { class: 'btn primary', style: 'flex:1', text: '+ تمرين', on: { click: function () { openExerciseSheet(null); } } }),
+        h('button', { class: 'btn', style: 'flex:1', text: 'استيراد فيديوهات', on: { click: startImport } })
+      ]));
+      var arch = d.exercises.filter(function (e) { return e.archived; }).length;
+      if (arch) box.appendChild(row('الأرشيف', null, arch, openArchive));
+    }
 
-    // الجذر: العضلات
-    if (!g) {
-      box.appendChild(head('المكتبة', false));
-      renderPendingBanner(box);
-      if (UI.editing) {
-        box.appendChild(h('div', { class: 'actions', style: 'display:flex;gap:10px;margin-bottom:14px' }, [
-          h('button', { class: 'btn primary', style: 'flex:1', text: '+ تمرين', on: { click: function () { openExerciseSheet(null); } } }),
-          h('button', { class: 'btn', style: 'flex:1', text: 'استيراد فيديوهات', on: { click: startImport } })
-        ]));
-        var arch = d.exercises.filter(function (e) { return e.archived; }).length;
-        if (arch) box.appendChild(row('الأرشيف', null, arch, openArchive));
-      }
-      var total = d.exercises.filter(function (e) { return !e.archived; }).length;
-      if (!total && !pending().length && !UI.editing) {
+    var all = sortedExercises();
+    if (!all.length) {
+      if (!pending().length && !UI.editing) {
         box.appendChild(h('div', { class: 'empty', text: 'المكتبة فاضية. دوس على القلم فوق عشان تستورد فيديوهاتك أو تضيف تمرين.' }));
       }
-      d.muscles.forEach(function (m) {
-        var n = exercisesIn(placeIdsOf(m)).length;
-        box.appendChild(row(m.name, null, n, function () { view.muscleId = m.id; view.placeId = null; UI.render(); }));
-      });
       return;
     }
 
-    var hasParts = g.parts && g.parts.length;
+    // البحث + القايمة الكاملة (بتتحدّث من غير ما الشاشة كلها تتعاد، عشان الكيبورد ما يقفلش)
+    var input = h('input', { type: 'text', placeholder: 'ابحث: اسم التمرين أو العضلة (مثلًا: صدر علوي)', autocomplete: 'off', enterkeyhint: 'search', 'aria-label': 'بحث' });
+    input.value = query;
+    var clear = h('button', { class: 'search-clear', 'aria-label': 'مسح البحث', on: { click: function () {
+      input.value = ''; query = ''; update(); input.focus();
+    } } }, [UI.icon(ICON.x)]);
+    var count = h('p', { class: 'dim', style: 'margin:0 0 10px' });
+    var list = h('div');
+    box.appendChild(h('div', { class: 'search-wrap' }, [input, clear]));
+    box.appendChild(count);
+    box.appendChild(list);
 
-    // مستوى الأجزاء
-    if (hasParts && !view.placeId) {
-      box.appendChild(head(g.name, true));
-      g.parts.forEach(function (p) {
-        box.appendChild(row(p.name, null, exercisesIn([p.id]).length, function () { view.placeId = p.id; UI.render(); }));
-      });
-      return;
+    function update() {
+      var tokens = norm(query).split(/\s+/).filter(Boolean);
+      var shown = all.filter(function (e) { return matches(e, tokens); });
+      list.textContent = '';
+      clear.style.display = query ? '' : 'none';
+      count.textContent = tokens.length ? shown.length + ' من ' + all.length + ' تمرين' : all.length + ' تمرين';
+      if (!shown.length) list.appendChild(h('div', { class: 'empty', text: 'مفيش تمرين بالاسم ده. جرب كلمة تانية.' }));
+      shown.forEach(function (ex) { list.appendChild(exerciseRow(ex)); });
     }
-
-    // مستوى التمارين
-    var pid = hasParts ? view.placeId : g.id;
-    var title = hasParts ? g.name + ' › ' + M.findPlace(d, pid).name : g.name;
-    box.appendChild(head(title, true));
-    var list = exercisesIn([pid]);
-    if (UI.editing) {
-      box.appendChild(h('button', { class: 'btn primary block', style: 'margin-bottom:14px', text: '+ تمرين هنا', on: { click: function () { openExerciseSheet(null); } } }));
-    }
-    if (!list.length) box.appendChild(h('div', { class: 'empty', text: 'مفيش تمارين هنا لسه' }));
-    list.forEach(function (ex) { box.appendChild(exerciseRow(ex)); });
+    input.addEventListener('input', function () { query = input.value; update(); });
+    update();
   }
 
   UI.onEditingChange = function () { UI.render(); };
