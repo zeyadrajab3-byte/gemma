@@ -308,11 +308,16 @@
   }
 
   function exerciseRow(ex) {
-    var extra = ex.videoFile ? h('span', { class: 'dim' }, [UI.icon(ICON.play)]) : null;
-    if (extra) { extra.firstChild.style.cssText = 'width:20px;height:20px;fill:currentColor'; }
-    return row(ex.name, placeLabel(ex.placeId) + (ex.videoFile ? '' : ' · من غير فيديو'), null, function () {
+    var info = h('div', { class: 'grow' }, [
+      h('div', { class: 'name', text: ex.name }),
+      h('div', { class: 'sub', text: placeLabel(ex.placeId) + (ex.videoFile ? '' : ' · من غير فيديو') })
+    ]);
+    var kids = [];
+    if (ex.videoFile && window.GemmaThumbs) kids.push(window.GemmaThumbs.make(ex));
+    kids.push(info);
+    return h('div', { class: 'row', role: 'button', on: { click: function () {
       if (UI.editing) openExerciseSheet(ex); else playVideo(ex);
-    }, extra);
+    } } }, kids);
   }
 
   function renderPendingBanner(box) {
