@@ -1,16 +1,11 @@
 /* جِمّا - الرئيسية (www/home.js)
    تحية + كارت السعرات: أكلت كام وفاضلك كام. الضغط عليه بيفتح صفحة الأكل بالتفاصيل. */
 (function () {
-  var UI = window.GemmaUI, h = UI.h, S = window.GemmaStore, F = window.GemmaFood;
+  var UI = window.GemmaUI, h = UI.h, S = window.GemmaStore, F = window.GemmaFood, W = window.GemmaWorkout;
   var ICON_BACK = '<path d="M5 12h14M13 6l6 6-6 6"/>';
 
   function num(t) { return h('span', { class: 'num', text: String(t) }); }
   function r0(n) { return Math.round(n); }
-
-  function greeting() {
-    var hr = new Date().getHours();
-    return (hr >= 5 && hr < 12 ? 'صباح الخير' : 'مساء الخير') + ' يا زياد';
-  }
 
   function calorieCard() {
     var tot = F.totalsOn(S.today());
@@ -46,7 +41,10 @@
 
   window.GemmaScreens = window.GemmaScreens || {};
   window.GemmaScreens.home = function (box) {
-    box.appendChild(h('div', { class: 'page-head' }, [h('h1', { class: 'title', text: greeting() })]));
+    // صفحة التمرين (بتفتح من كارت التمرين)
+    if (W.isOpen() && W.render(box)) return;
+    box.appendChild(h('div', { class: 'page-head' }, [h('h1', { class: 'title', text: 'الرئيسية' })]));
     box.appendChild(calorieCard());
+    box.appendChild(W.card());
   };
 })();
