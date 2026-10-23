@@ -120,8 +120,7 @@
   };
 
   // ---------- الشاشات والتنقل ----------
-  // الشاشة الأولى مؤقتًا هي المكتبة لحد ما الرئيسية تتبني (المرحلة 2)
-  var START_TAB = 'library';
+  var START_TAB = 'home';
   var TABS = [
     { id: 'home', label: 'الرئيسية', icon: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>' },
     { id: 'library', label: 'المكتبة', icon: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 9l5 3-5 3z"/>' },
@@ -203,6 +202,10 @@
     }
     var A = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
     if (A && A.addListener) A.addListener('backButton', onBackButton);
+    // أول تشغيل: أسئلة السعرات والهدف والماكروز (مرة واحدة بس)
+    if (window.GemmaOnboarding) {
+      try { await window.GemmaOnboarding.run(); } catch (e) { console.error(e); }
+    }
     go(START_TAB);
   }
 
