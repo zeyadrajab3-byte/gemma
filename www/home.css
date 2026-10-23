@@ -1,0 +1,30 @@
+/* جِمّا - الرئيسية وأول تشغيل وكارت الماكروز (www/home.css) */
+
+/* كارت السعرات في الرئيسية */
+.tap { cursor: pointer; }
+.tap:active { transform: scale(.99); }
+.cal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.cal-box .lbl { color: var(--text-dim); font-size: 14px; }
+.cal-box .unit { color: var(--text-dim); font-size: 14px; }
+.cal-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; color: var(--text-dim); font-size: 14px; }
+.cal-foot svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* كارت الماكروز في صفحة الأكل */
+.mac-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.mac-head h3 { margin: 0; font-size: 20px; }
+.mac { margin-bottom: 14px; }
+.mac:last-child { margin-bottom: 0; }
+.mac-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.mac-name { font-weight: 600; }
+.mac-sub { font-size: 13px; margin-top: 3px; }
+
+/* أول تشغيل: شاشة كاملة فوق التطبيق */
+.onb { position: fixed; inset: 0; z-index: 60; background: var(--bg); display: flex; flex-direction: column; }
+.onb-top { padding: calc(env(safe-area-inset-top, 0px) + 14px) 16px 8px; }
+.onb-top .step { color: var(--text-dim); font-size: 14px; margin-bottom: 6px; }
+.onb-body { flex: 1; overflow-y: auto; padding: 8px 16px 16px; }
+.onb-body h1 { margin: 0 0 6px; font-size: 28px; }
+.onb-foot { display: flex; gap: 10px; padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); border-top: 1px solid var(--line); background: var(--card); }
+.onb-foot .btn { flex: 1; }
+.onb-foot .btn.primary { flex: 2; }
+.stepper .btn { direction: ltr; }
