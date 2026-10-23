@@ -29,7 +29,7 @@
     moderate: { met: 5, label: 'متوسط' },
     hard: { met: 6, label: 'عالي (تمرين شاق ومتواصل)' }
   };
-  var GOALS = { cut: 'تنشيف', maintain: 'ثبات', bulk: 'زيادة' };
+  var GOALS = { cut: 'تنشيف', maintain: 'ثبات', bulk: 'تضخيم' };
   var GOAL_DEFAULT = { cut: 500, maintain: 0, bulk: 300 };
 
   function D() { return S.data; }
@@ -71,6 +71,20 @@
     if (!e.maintenance) return null;
     var d = e.goal === 'cut' ? -e.amount : e.goal === 'bulk' ? e.amount : 0;
     return Math.max(0, e.maintenance + d);
+  }
+
+  // احتياجك اليومي من الماكروز (جرام). بيتحدد في أول تشغيل وبيتعدل من صفحة الأكل
+  function macroTargets() {
+    var m = energy().macros;
+    return (m && m.p > 0 && m.c > 0 && m.f > 0) ? m : null;
+  }
+  function totalsOn(date) {
+    var t = { kcal: 0, p: 0, c: 0, f: 0 };
+    D().foodLogs.forEach(function (e) {
+      if (e.date !== date) return;
+      t.kcal += e.kcal || 0; t.p += e.p || 0; t.c += e.c || 0; t.f += e.f || 0;
+    });
+    return t;
   }
 
   // ---------- الحساب ----------
@@ -208,9 +222,8 @@
       var goalTxt = GOALS[energy().goal] + (energy().goal !== 'maintain' ? ' ' + (energy().goal === 'cut' ? '−' : '+') + energy().amount : '');
       card.appendChild(h('div', { class: 'dim' }, ['الهدف ', num(r0(target)), ' · أكلت ', num(r0(eaten)), ' · ', goalTxt]));
     }
-    var ml = macroLine(tot);
-    if (ml) card.appendChild(h('div', { class: 'dim', style: 'margin-top:6px;font-size:14px', text: ml }));
     box.appendChild(card);
+    box.appendChild(macroCard(tot));
 
     // أزرار التسجيل
     box.appendChild(h('div', { class: 'actions', style: 'display:flex;gap:10px;margin-bottom:14px' }, [
@@ -239,6 +252,64 @@
     box.appendChild(h('div', { style: 'height:8px' }));
     box.appendChild(linkRow('سعراتي (الثبات والهدف)', en.maintenance ? 'ثبات ' + en.maintenance + ' · هدف ' + r0(target) : 'لسه ماتحددتش', function () { view.sub = 'energy'; UI.render(); }));
     box.appendChild(linkRow('وجباتي', D().savedMeals.length + ' وجبة محفوظة', function () { view.sub = 'meals'; UI.render(); }));
+  }
+
+  // كارت الماكروز: أكلت كام وفاضلك كام جرام من احتياجك
+  function macroCard(tot) {
+    var mt = macroTargets();
+    var card = h('div', { class: 'card' });
+    card.appendChild(h('div', { class: 'mac-head' }, [
+      h('h3', { class: 'title', text: 'احتياجي من الماكروز' }),
+      h('button', { class: 'btn small', text: mt ? 'تعديل' : 'حدد', on: { click: openMacroEditor } })
+    ]));
+    if (!mt) {
+      card.appendChild(h('p', { class: 'dim', style: 'margin:0', text: 'حدد احتياجك اليومي من البروتين والكارب والدهون عشان يظهرلك فاضلك كام من كل واحد.' }));
+      return card;
+    }
+    [['p', 'بروتين'], ['c', 'كارب'], ['f', 'دهون']].forEach(function (k) {
+      var need = mt[k[0]], got = tot[k[0]] || 0, left = need - got, over = left < 0;
+      var pct = Math.min(100, Math.round(got / need * 100));
+      card.appendChild(h('div', { class: 'mac' }, [
+        h('div', { class: 'mac-top' }, [
+          h('span', { class: 'mac-name', text: k[1] }),
+          h('span', { class: over ? 'danger-text' : '' }, [over ? 'زيادة ' : 'فاضلك ', num(r0(Math.abs(left))), ' جم'])
+        ]),
+        h('div', { class: 'progress' }, [h('i', { style: 'width:' + pct + '%' + (over ? ';background:var(--danger)' : '') })]),
+        h('div', { class: 'dim mac-sub' }, ['أكلت ', num(r0(got)), ' من ', num(r0(need)), ' جم'])
+      ]));
+    });
+    return card;
+  }
+
+  function openMacroEditor() {
+    var en = energy(), m = en.macros || {};
+    var pin = numIn(m.p || '', { placeholder: 'جم' });
+    var cin = numIn(m.c || '', { placeholder: 'جم' });
+    var fin = numIn(m.f || '', { placeholder: 'جم' });
+    var info = h('p', { class: 'dim', style: 'font-size:14px;margin:0 0 4px' });
+    function refresh() {
+      var p = val(pin) || 0, c = val(cin) || 0, f = val(fin) || 0;
+      var k = r0(p * 4 + c * 4 + f * 9), t = targetKcal();
+      info.textContent = 'ده يساوي تقريبًا ' + k + ' سعرة' + (t ? ' (هدفك ' + r0(t) + ')' : '') + '. (بروتين وكارب 4 سعرات للجرام، والدهون 9)';
+    }
+    [pin, cin, fin].forEach(function (i) { i.addEventListener('input', refresh); });
+    refresh();
+    UI.sheet({
+      title: 'احتياجي اليومي من الماكروز',
+      content: h('div', {}, [
+        h('div', { class: 'grid3' }, [field('بروتين جم', pin), field('كارب جم', cin), field('دهون جم', fin)]),
+        info
+      ]),
+      actions: [
+        { label: 'إلغاء' },
+        { label: 'حفظ', kind: 'primary', onClick: function () {
+          var p = val(pin), c = val(cin), f = val(fin);
+          if (!p || !c || !f || p <= 0 || c <= 0 || f <= 0 || p > 1000 || c > 1500 || f > 600) { UI.toast('اكتب الثلاثة أرقام منطقية'); return false; }
+          en.macros = { p: r0(p), c: r0(c), f: r0(f) };
+          save();
+        } }
+      ]
+    });
   }
 
   // ---------- تسجيل أكل ----------
@@ -325,16 +396,18 @@
   function openQuickAdd(date) {
     var nameIn = h('input', { type: 'text', placeholder: 'اسم (اختياري)' });
     var kin = numIn('', { placeholder: 'السعرات' });
-    var pin = numIn('', { placeholder: 'بروتين بالجرام (اختياري)' });
+    var pin = numIn('', { placeholder: 'اختياري' });
+    var cin = numIn('', { placeholder: 'اختياري' });
+    var fin = numIn('', { placeholder: 'اختياري' });
     UI.sheet({
       title: 'إضافة سريعة (' + dateLabel(date) + ')',
-      content: h('div', {}, [field('الاسم', nameIn), field('السعرات', kin), field('البروتين (جم)', pin)]),
+      content: h('div', {}, [field('الاسم', nameIn), field('السعرات', kin), h('div', { class: 'grid3' }, [field('بروتين جم', pin), field('كارب جم', cin), field('دهون جم', fin)])]),
       actions: [
         { label: 'إلغاء' },
         { label: 'سجل', kind: 'primary', onClick: function () {
           var k = val(kin);
           if (!k || k <= 0) { UI.toast('اكتب السعرات'); return false; }
-          addEntry(date, { name: nameIn.value.trim() || 'إضافة سريعة', kcal: r0(k), p: val(pin) || 0 })
+          addEntry(date, { name: nameIn.value.trim() || 'إضافة سريعة', kcal: r0(k), p: val(pin) || 0, c: val(cin) || 0, f: val(fin) || 0 })
             .then(function () { UI.render(); }).catch(fail);
         } }
       ]
@@ -488,6 +561,10 @@
     }
     box.appendChild(gc);
 
+    // احتياجك من الماكروز
+    var mt = macroTargets();
+    box.appendChild(linkRow('احتياجي من الماكروز', mt ? 'بروتين ' + mt.p + ' · كارب ' + mt.c + ' · دهون ' + mt.f : 'لسه ماتحددش', openMacroEditor));
+
     // 3) الحاسبة
     box.appendChild(calculatorCard());
   }
@@ -611,6 +688,17 @@
   // للمراحل الجاية (ملخص الرئيسية، التحليلات)
   window.GemmaFood = {
     targetKcal: targetKcal,
-    eatenOn: function (date) { return entriesOf(date).reduce(function (s, e) { return s + (e.kcal || 0); }, 0); }
+    eatenOn: function (date) { return entriesOf(date).reduce(function (s, e) { return s + (e.kcal || 0); }, 0); },
+    totalsOn: totalsOn,
+    macroTargets: macroTargets,
+    energy: energy,
+    profile: profile,
+    calcTdee: calcTdee,
+    NEAT: NEAT,
+    INTENSITY: INTENSITY,
+    GOALS: GOALS,
+    GOAL_DEFAULT: GOAL_DEFAULT,
+    // من الرئيسية: افتح صفحة الأكل على النهارده
+    openToday: function () { view.sub = null; view.date = null; UI.go('food'); }
   };
 })();
